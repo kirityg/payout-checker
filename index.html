@@ -129,17 +129,17 @@
                     <div class="card no-payout">
                         <div class="label">No Payout</div>
                         <div class="value" id="custNoPayout">0</div>
-                        <div class="sub">Positive closing balance (funds stuck)</div>
+                        <div class="sub">CB - OB &gt; 0 (funds accumulated)</div>
                     </div>
                     <div class="card settled">
-                        <div class="label">Payout Settled</div>
+                        <div class="label">No Change</div>
                         <div class="value" id="custSettled">0</div>
-                        <div class="sub">All accounts at zero</div>
+                        <div class="sub">CB - OB = 0 (no movement)</div>
                     </div>
                     <div class="card negative">
-                        <div class="label">Negative Balance</div>
+                        <div class="label">Paid Out</div>
                         <div class="value" id="custNegative">0</div>
-                        <div class="sub">Overdraft / issue</div>
+                        <div class="sub">CB - OB &lt; 0 (funds moved out)</div>
                     </div>
                 </div>
 
@@ -156,16 +156,16 @@
                         <select id="custPlatformFilter"><option value="">All</option></select>
                         <label>Status:</label>
                         <select id="custStatusFilter">
-                            <option value="no-payout">No Payout (Positive Balance)</option>
-                            <option value="negative">Negative Balance</option>
-                            <option value="settled">Settled (Zero Balance)</option>
+                            <option value="no-payout">No Payout (CB - OB &gt; 0)</option>
+                            <option value="paidout">Paid Out (CB - OB &lt; 0)</option>
+                            <option value="settled">No Change (CB - OB = 0)</option>
                             <option value="">All</option>
                         </select>
                     </div>
                     <div class="legend">
-                        <div class="legend-item"><span class="badge badge-no-payout">No Payout</span> Closing balance &gt; 0 (funds not paid out)</div>
-                        <div class="legend-item"><span class="badge badge-settled">Settled</span> Closing balance = 0 (payout completed)</div>
-                        <div class="legend-item"><span class="badge badge-negative">Negative</span> Closing balance &lt; 0 (overdraft/issue)</div>
+                        <div class="legend-item"><span class="badge badge-no-payout">No Payout</span> CB - OB &gt; 0 (funds accumulated, not paid out)</div>
+                        <div class="legend-item"><span class="badge badge-settled">Paid Out</span> CB - OB &lt; 0 (funds moved out)</div>
+                        <div class="legend-item"><span class="badge badge-negative">No Change</span> CB - OB = 0 (no movement)</div>
                     </div>
                     <div class="table-container">
                         <table>
@@ -189,17 +189,17 @@
                     <div class="card no-payout">
                         <div class="label">No Payout</div>
                         <div class="value" id="acctNoPayout">0</div>
-                        <div class="sub">Positive closing balance</div>
+                        <div class="sub">CB - OB &gt; 0 (funds accumulated)</div>
                     </div>
                     <div class="card settled">
-                        <div class="label">Settled</div>
+                        <div class="label">No Change</div>
                         <div class="value" id="acctSettled">0</div>
-                        <div class="sub">Closing balance = 0</div>
+                        <div class="sub">CB - OB = 0 (no movement)</div>
                     </div>
                     <div class="card negative">
-                        <div class="label">Negative</div>
+                        <div class="label">Paid Out</div>
                         <div class="value" id="acctNegative">0</div>
-                        <div class="sub">Closing balance &lt; 0</div>
+                        <div class="sub">CB - OB &lt; 0 (funds moved out)</div>
                     </div>
                 </div>
 
@@ -218,9 +218,9 @@
                         <select id="acctCurrencyFilter"><option value="">All</option></select>
                         <label>Status:</label>
                         <select id="acctStatusFilter">
-                            <option value="no-payout">No Payout (Positive Balance)</option>
-                            <option value="negative">Negative Balance</option>
-                            <option value="settled">Settled (Zero Balance)</option>
+                            <option value="no-payout">No Payout (CB - OB &gt; 0)</option>
+                            <option value="paidout">Paid Out (CB - OB &lt; 0)</option>
+                            <option value="settled">No Change (CB - OB = 0)</option>
                             <option value="">All</option>
                         </select>
                     </div>
@@ -286,9 +286,10 @@
             reader.readAsText(file);
         }
 
-        function classifyRow(closingAmt) {
-            if (closingAmt > 0) return 'no-payout';
-            if (closingAmt < 0) return 'negative';
+        function classifyRow(closingAmt, openingAmt) {
+            const diff = closingAmt - openingAmt;
+            if (diff > 0) return 'no-payout';
+            if (diff < 0) return 'paidout';
             return 'settled';
         }
 
@@ -306,7 +307,7 @@
                 headers.forEach((h, idx) => row[h] = values[idx] || '');
                 row._closingAmt = parseFloat(row['Closing Balance Amount']) || 0;
                 row._openingAmt = parseFloat(row['Opening Balance Amount']) || 0;
-                row._status = classifyRow(row._closingAmt);
+                row._status = classifyRow(row._closingAmt, row._openingAmt);
                 allRows.push(row);
             }
 
@@ -335,24 +336,24 @@
                         'Balance Platform': r['Balance Platform'],
                         _accounts: [],
                         _totalClosing: 0,
-                        _hasPositive: false,
-                        _hasNegative: false,
+                        _hasNoPayout: false,
+                        _hasPaidout: false,
                     };
                 }
                 const h = holderMap[ah];
                 h._accounts.push(r);
                 h._totalClosing += r._closingAmt;
-                if (r._closingAmt > 0) h._hasPositive = true;
-                if (r._closingAmt < 0) h._hasNegative = true;
+                if (r._status === 'no-payout') h._hasNoPayout = true;
+                if (r._status === 'paidout') h._hasPaidout = true;
             });
 
             customerData = Object.values(holderMap).map(h => {
                 h._numAccounts = h._accounts.length;
                 h._maxClosing = Math.max(...h._accounts.map(a => a._closingAmt));
                 h._minClosing = Math.min(...h._accounts.map(a => a._closingAmt));
-                // Customer status: if ANY account has positive balance, they have unsettled funds
-                if (h._hasPositive) h._status = 'no-payout';
-                else if (h._hasNegative) h._status = 'negative';
+                // Customer status: if ANY account has CB-OB > 0, no payout
+                if (h._hasNoPayout) h._status = 'no-payout';
+                else if (h._hasPaidout) h._status = 'paidout';
                 else h._status = 'settled';
                 return h;
             });
@@ -407,7 +408,7 @@
             document.getElementById('custTotal').textContent = customerData.length;
             document.getElementById('custNoPayout').textContent = customerData.filter(c => c._status === 'no-payout').length;
             document.getElementById('custSettled').textContent = customerData.filter(c => c._status === 'settled').length;
-            document.getElementById('custNegative').textContent = customerData.filter(c => c._status === 'negative').length;
+            document.getElementById('custNegative').textContent = customerData.filter(c => c._status === 'paidout').length;
         }
 
         const custCols = [
@@ -453,8 +454,8 @@
                         return `<td>${val}</td>`;
                     }).join('');
                     const badge = c._status === 'no-payout' ? '<span class="badge badge-no-payout">No Payout</span>'
-                        : c._status === 'negative' ? '<span class="badge badge-negative">Negative</span>'
-                        : '<span class="badge badge-settled">Settled</span>';
+                        : c._status === 'paidout' ? '<span class="badge badge-settled">Paid Out</span>'
+                        : '<span class="badge badge-negative">No Change</span>';
                     return `<tr><td>${rowNum}</td>${cells}<td>${badge}</td></tr>`;
                 }).join('');
             }
@@ -498,7 +499,7 @@
             document.getElementById('acctTotal').textContent = allRows.length;
             document.getElementById('acctNoPayout').textContent = allRows.filter(r => r._status === 'no-payout').length;
             document.getElementById('acctSettled').textContent = allRows.filter(r => r._status === 'settled').length;
-            document.getElementById('acctNegative').textContent = allRows.filter(r => r._status === 'negative').length;
+            document.getElementById('acctNegative').textContent = allRows.filter(r => r._status === 'paidout').length;
         }
 
         const acctCols = ['Balance Platform', 'Account Holder', 'Balance Account', 'Opening Balance Currency', 'Opening Balance Amount', 'Opening Date', 'Closing Balance Currency', 'Closing Balance Amount', 'Closing Date'];
@@ -538,8 +539,8 @@
                         return `<td>${r[col]}</td>`;
                     }).join('');
                     const badge = r._status === 'no-payout' ? '<span class="badge badge-no-payout">No Payout</span>'
-                        : r._status === 'negative' ? '<span class="badge badge-negative">Negative</span>'
-                        : '<span class="badge badge-settled">Settled</span>';
+                        : r._status === 'paidout' ? '<span class="badge badge-settled">Paid Out</span>'
+                        : '<span class="badge badge-negative">No Change</span>';
                     return `<tr><td>${rowNum}</td>${cells}<td>${badge}</td></tr>`;
                 }).join('');
             }
