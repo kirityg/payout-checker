@@ -20,13 +20,21 @@
         .upload-section p { color: #666; margin-bottom: 8px; }
         .upload-section .hint { font-size: 12px; color: #999; }
         .upload-section input[type="file"] { display: none; }
+        .file-info { margin-top: 10px; font-size: 13px; color: #1a237e; font-weight: 600; }
+        .report-date { background: #e8eaf6; color: #1a237e; padding: 12px 24px; border-radius: 10px; font-size: 16px; font-weight: 600; text-align: center; margin-bottom: 20px; }
 
-        .summary-cards { display: grid; grid-template-columns: repeat(auto-fit, minmax(220px, 1fr)); gap: 16px; margin-bottom: 24px; }
+        .tabs { display: flex; gap: 0; margin-bottom: 24px; background: white; border-radius: 12px; overflow: hidden; box-shadow: 0 1px 4px rgba(0,0,0,0.08); }
+        .tab { flex: 1; padding: 14px 20px; text-align: center; cursor: pointer; font-size: 14px; font-weight: 500; color: #666; border-bottom: 3px solid transparent; transition: all 0.2s; }
+        .tab:hover { background: #f5f5f5; }
+        .tab.active { color: #1a237e; border-bottom-color: #1a237e; background: #e8eaf6; }
+
+        .summary-cards { display: grid; grid-template-columns: repeat(auto-fit, minmax(200px, 1fr)); gap: 16px; margin-bottom: 24px; }
         .card { background: white; border-radius: 12px; padding: 24px; box-shadow: 0 1px 4px rgba(0,0,0,0.08); }
-        .card .label { font-size: 13px; color: #888; text-transform: uppercase; letter-spacing: 0.5px; margin-bottom: 8px; }
-        .card .value { font-size: 32px; font-weight: 700; }
+        .card .label { font-size: 12px; color: #888; text-transform: uppercase; letter-spacing: 0.5px; margin-bottom: 8px; }
+        .card .value { font-size: 28px; font-weight: 700; }
+        .card .sub { font-size: 11px; color: #aaa; margin-top: 4px; }
         .card.total .value { color: #1a237e; }
-        .card.payout .value { color: #2e7d32; }
+        .card.settled .value { color: #2e7d32; }
         .card.no-payout .value { color: #c62828; }
         .card.negative .value { color: #e65100; }
 
@@ -63,12 +71,10 @@
 
         .badge { display: inline-block; padding: 3px 10px; border-radius: 12px; font-size: 11px; font-weight: 600; }
         .badge-no-payout { background: #ffebee; color: #c62828; }
-        .badge-payout { background: #e8f5e9; color: #2e7d32; }
+        .badge-settled { background: #e8f5e9; color: #2e7d32; }
         .badge-negative { background: #fff3e0; color: #e65100; }
 
         .table-container { max-height: 600px; overflow-y: auto; }
-        .no-data { text-align: center; padding: 60px; color: #999; }
-        .no-data svg { width: 64px; height: 64px; fill: #ddd; margin-bottom: 16px; }
 
         .hidden { display: none !important; }
 
@@ -77,6 +83,9 @@
         .pagination .page-btn { padding: 6px 12px; border: 1px solid #ddd; background: white; border-radius: 6px; cursor: pointer; font-size: 13px; }
         .pagination .page-btn.active { background: #1a237e; color: white; border-color: #1a237e; }
         .pagination .page-btn:hover:not(.active) { background: #f5f5f5; }
+
+        .legend { padding: 16px 24px; background: #fafafa; border-bottom: 1px solid #eee; font-size: 12px; color: #666; display: flex; gap: 20px; flex-wrap: wrap; }
+        .legend-item { display: flex; align-items: center; gap: 6px; }
 
         @media (max-width: 768px) {
             .header { padding: 16px 20px; }
@@ -99,62 +108,132 @@
             <svg viewBox="0 0 24 24"><path d="M19.35 10.04C18.67 6.59 15.64 4 12 4 9.11 4 6.6 5.64 5.35 8.04 2.34 8.36 0 10.91 0 14c0 3.31 2.69 6 6 6h13c2.76 0 5-2.24 5-5 0-2.64-2.05-4.78-4.65-4.96zM14 13v4h-4v-4H7l5-5 5 5h-3z"/></svg>
             <p><strong>Drop your CSV file here</strong> or click to browse</p>
             <div class="hint">Supports Balance Platform balance report CSV files</div>
+            <div class="file-info hidden" id="fileInfo"></div>
             <input type="file" id="fileInput" accept=".csv">
         </div>
 
         <div id="dashboard" class="hidden">
-            <div class="summary-cards">
-                <div class="card total">
-                    <div class="label">Total Balance Accounts</div>
-                    <div class="value" id="totalCount">0</div>
+            <div class="report-date" id="reportDate"></div>
+            <div class="tabs">
+                <div class="tab active" data-view="customers">Customers (Account Holders)</div>
+                <div class="tab" data-view="accounts">Balance Accounts (All Rows)</div>
+            </div>
+
+            <div id="customerView">
+                <div class="summary-cards">
+                    <div class="card total">
+                        <div class="label">Total Customers</div>
+                        <div class="value" id="custTotal">0</div>
+                        <div class="sub">Unique Account Holders</div>
+                    </div>
+                    <div class="card no-payout">
+                        <div class="label">No Payout</div>
+                        <div class="value" id="custNoPayout">0</div>
+                        <div class="sub">Positive closing balance (funds stuck)</div>
+                    </div>
+                    <div class="card settled">
+                        <div class="label">Payout Settled</div>
+                        <div class="value" id="custSettled">0</div>
+                        <div class="sub">All accounts at zero</div>
+                    </div>
+                    <div class="card negative">
+                        <div class="label">Negative Balance</div>
+                        <div class="value" id="custNegative">0</div>
+                        <div class="sub">Overdraft / issue</div>
+                    </div>
                 </div>
-                <div class="card payout">
-                    <div class="label">With Payout</div>
-                    <div class="value" id="payoutCount">0</div>
-                </div>
-                <div class="card no-payout">
-                    <div class="label">No Payout (Zero Balance)</div>
-                    <div class="value" id="noPayoutCount">0</div>
-                </div>
-                <div class="card negative">
-                    <div class="label">Negative Closing Balance</div>
-                    <div class="value" id="negativeCount">0</div>
+
+                <div class="results-section">
+                    <div class="results-header">
+                        <h2 id="custTableTitle">Customers Without Payout</h2>
+                        <div class="controls">
+                            <input type="text" class="search-box" id="custSearchBox" placeholder="Search Account Holder...">
+                            <button class="btn btn-export" id="custExportBtn">Export CSV</button>
+                        </div>
+                    </div>
+                    <div class="filter-row">
+                        <label>Platform:</label>
+                        <select id="custPlatformFilter"><option value="">All</option></select>
+                        <label>Status:</label>
+                        <select id="custStatusFilter">
+                            <option value="no-payout">No Payout (Positive Balance)</option>
+                            <option value="negative">Negative Balance</option>
+                            <option value="settled">Settled (Zero Balance)</option>
+                            <option value="">All</option>
+                        </select>
+                    </div>
+                    <div class="legend">
+                        <div class="legend-item"><span class="badge badge-no-payout">No Payout</span> Closing balance &gt; 0 (funds not paid out)</div>
+                        <div class="legend-item"><span class="badge badge-settled">Settled</span> Closing balance = 0 (payout completed)</div>
+                        <div class="legend-item"><span class="badge badge-negative">Negative</span> Closing balance &lt; 0 (overdraft/issue)</div>
+                    </div>
+                    <div class="table-container">
+                        <table>
+                            <thead><tr id="custTableHead"></tr></thead>
+                            <tbody id="custTableBody"></tbody>
+                        </table>
+                    </div>
+                    <div class="pagination">
+                        <span id="custPageInfo"></span>
+                        <div class="page-btns" id="custPageButtons"></div>
+                    </div>
                 </div>
             </div>
 
-            <div class="results-section">
-                <div class="results-header">
-                    <h2 id="tableTitle">Customers Without Payout</h2>
-                    <div class="controls">
-                        <input type="text" class="search-box" id="searchBox" placeholder="Search Account Holder or Balance Account...">
-                        <button class="btn btn-secondary" id="toggleView">Show All</button>
-                        <button class="btn btn-export" id="exportBtn">Export CSV</button>
+            <div id="accountView" class="hidden">
+                <div class="summary-cards">
+                    <div class="card total">
+                        <div class="label">Total Balance Accounts</div>
+                        <div class="value" id="acctTotal">0</div>
+                    </div>
+                    <div class="card no-payout">
+                        <div class="label">No Payout</div>
+                        <div class="value" id="acctNoPayout">0</div>
+                        <div class="sub">Positive closing balance</div>
+                    </div>
+                    <div class="card settled">
+                        <div class="label">Settled</div>
+                        <div class="value" id="acctSettled">0</div>
+                        <div class="sub">Closing balance = 0</div>
+                    </div>
+                    <div class="card negative">
+                        <div class="label">Negative</div>
+                        <div class="value" id="acctNegative">0</div>
+                        <div class="sub">Closing balance &lt; 0</div>
                     </div>
                 </div>
-                <div class="filter-row">
-                    <label>Platform:</label>
-                    <select id="platformFilter"><option value="">All</option></select>
-                    <label>Currency:</label>
-                    <select id="currencyFilter"><option value="">All</option></select>
-                    <label>Status:</label>
-                    <select id="statusFilter">
-                        <option value="no-payout">No Payout</option>
-                        <option value="payout">With Payout</option>
-                        <option value="negative">Negative Balance</option>
-                        <option value="">All</option>
-                    </select>
-                </div>
-                <div class="table-container" id="tableContainer">
-                    <table>
-                        <thead>
-                            <tr id="tableHead"></tr>
-                        </thead>
-                        <tbody id="tableBody"></tbody>
-                    </table>
-                </div>
-                <div class="pagination" id="pagination">
-                    <span id="pageInfo"></span>
-                    <div class="page-btns" id="pageButtons"></div>
+
+                <div class="results-section">
+                    <div class="results-header">
+                        <h2 id="acctTableTitle">Balance Accounts Without Payout</h2>
+                        <div class="controls">
+                            <input type="text" class="search-box" id="acctSearchBox" placeholder="Search Account Holder or Balance Account...">
+                            <button class="btn btn-export" id="acctExportBtn">Export CSV</button>
+                        </div>
+                    </div>
+                    <div class="filter-row">
+                        <label>Platform:</label>
+                        <select id="acctPlatformFilter"><option value="">All</option></select>
+                        <label>Currency:</label>
+                        <select id="acctCurrencyFilter"><option value="">All</option></select>
+                        <label>Status:</label>
+                        <select id="acctStatusFilter">
+                            <option value="no-payout">No Payout (Positive Balance)</option>
+                            <option value="negative">Negative Balance</option>
+                            <option value="settled">Settled (Zero Balance)</option>
+                            <option value="">All</option>
+                        </select>
+                    </div>
+                    <div class="table-container">
+                        <table>
+                            <thead><tr id="acctTableHead"></tr></thead>
+                            <tbody id="acctTableBody"></tbody>
+                        </table>
+                    </div>
+                    <div class="pagination">
+                        <span id="acctPageInfo"></span>
+                        <div class="page-btns" id="acctPageButtons"></div>
+                    </div>
                 </div>
             </div>
         </div>
@@ -162,12 +241,14 @@
 
     <script>
         const ROWS_PER_PAGE = 50;
-        let allData = [];
-        let filteredData = [];
-        let currentPage = 1;
-        let sortCol = null;
-        let sortAsc = true;
-        let showingAll = false;
+        let allRows = [];
+        let customerData = [];
+        let filteredCustomers = [];
+        let filteredAccounts = [];
+        let custPage = 1, acctPage = 1;
+        let custSortCol = null, custSortAsc = true;
+        let acctSortCol = null, acctSortAsc = true;
+        let currentView = 'customers';
 
         const dropZone = document.getElementById('dropZone');
         const fileInput = document.getElementById('fileInput');
@@ -184,19 +265,39 @@
         });
         fileInput.addEventListener('change', e => { if (e.target.files.length) handleFile(e.target.files[0]); });
 
+        // Tabs
+        document.querySelectorAll('.tab').forEach(tab => {
+            tab.addEventListener('click', () => {
+                document.querySelectorAll('.tab').forEach(t => t.classList.remove('active'));
+                tab.classList.add('active');
+                currentView = tab.dataset.view;
+                document.getElementById('customerView').classList.toggle('hidden', currentView !== 'customers');
+                document.getElementById('accountView').classList.toggle('hidden', currentView !== 'accounts');
+            });
+        });
+
         function handleFile(file) {
             if (!file.name.endsWith('.csv')) { alert('Please upload a CSV file.'); return; }
+            const info = document.getElementById('fileInfo');
+            info.textContent = 'Loaded: ' + file.name;
+            info.classList.remove('hidden');
             const reader = new FileReader();
-            reader.onload = e => parseCSV(e.target.result);
+            reader.onload = e => parseCSV(e.target.result, file.name);
             reader.readAsText(file);
         }
 
-        function parseCSV(text) {
+        function classifyRow(closingAmt) {
+            if (closingAmt > 0) return 'no-payout';
+            if (closingAmt < 0) return 'negative';
+            return 'settled';
+        }
+
+        function parseCSV(text, filename) {
             const lines = text.trim().split('\n');
             if (lines.length < 2) { alert('CSV file appears empty.'); return; }
 
             const headers = lines[0].split(',').map(h => h.trim());
-            allData = [];
+            allRows = [];
 
             for (let i = 1; i < lines.length; i++) {
                 const values = lines[i].split(',').map(v => v.trim());
@@ -205,44 +306,170 @@
                 headers.forEach((h, idx) => row[h] = values[idx] || '');
                 row._closingAmt = parseFloat(row['Closing Balance Amount']) || 0;
                 row._openingAmt = parseFloat(row['Opening Balance Amount']) || 0;
-
-                if (row._closingAmt === 0 && row._openingAmt === 0) {
-                    row._status = 'no-payout';
-                } else if (row._closingAmt < 0) {
-                    row._status = 'negative';
-                } else {
-                    row._status = 'payout';
-                }
-                allData.push(row);
+                row._status = classifyRow(row._closingAmt);
+                allRows.push(row);
             }
 
+            // Extract report date from filename (e.g. "...2026_03_24.csv") or from Opening Date column
+            let reportDate = '';
+            const filenameMatch = filename ? filename.match(/(\d{4})[_-](\d{2})[_-](\d{2})/) : null;
+            if (filenameMatch) {
+                reportDate = `${filenameMatch[1]}-${filenameMatch[2]}-${filenameMatch[3]}`;
+            } else if (allRows.length > 0 && allRows[0]['Opening Date']) {
+                reportDate = allRows[0]['Opening Date'].split(' ')[0];
+            }
+            if (reportDate) {
+                const d = new Date(reportDate + 'T00:00:00');
+                const formatted = d.toLocaleDateString('en-US', { weekday: 'long', year: 'numeric', month: 'long', day: 'numeric' });
+                document.getElementById('reportDate').textContent = 'Report Date: ' + formatted;
+                document.getElementById('reportDate').classList.remove('hidden');
+            }
+
+            // Aggregate by Account Holder
+            const holderMap = {};
+            allRows.forEach(r => {
+                const ah = r['Account Holder'];
+                if (!holderMap[ah]) {
+                    holderMap[ah] = {
+                        'Account Holder': ah,
+                        'Balance Platform': r['Balance Platform'],
+                        _accounts: [],
+                        _totalClosing: 0,
+                        _hasPositive: false,
+                        _hasNegative: false,
+                    };
+                }
+                const h = holderMap[ah];
+                h._accounts.push(r);
+                h._totalClosing += r._closingAmt;
+                if (r._closingAmt > 0) h._hasPositive = true;
+                if (r._closingAmt < 0) h._hasNegative = true;
+            });
+
+            customerData = Object.values(holderMap).map(h => {
+                h._numAccounts = h._accounts.length;
+                h._maxClosing = Math.max(...h._accounts.map(a => a._closingAmt));
+                h._minClosing = Math.min(...h._accounts.map(a => a._closingAmt));
+                // Customer status: if ANY account has positive balance, they have unsettled funds
+                if (h._hasPositive) h._status = 'no-payout';
+                else if (h._hasNegative) h._status = 'negative';
+                else h._status = 'settled';
+                return h;
+            });
+
             populateFilters();
-            showingAll = false;
-            document.getElementById('statusFilter').value = 'no-payout';
-            document.getElementById('toggleView').textContent = 'Show All';
-            document.getElementById('tableTitle').textContent = 'Customers Without Payout';
-            applyFilters();
+            document.getElementById('custStatusFilter').value = 'no-payout';
+            document.getElementById('acctStatusFilter').value = 'no-payout';
+            applyCustomerFilters();
+            applyAccountFilters();
             dashboard.classList.remove('hidden');
         }
 
         function populateFilters() {
-            const platforms = [...new Set(allData.map(r => r['Balance Platform']))].filter(Boolean).sort();
-            const currencies = [...new Set(allData.map(r => r['Closing Balance Currency']))].filter(Boolean).sort();
+            const platforms = [...new Set(allRows.map(r => r['Balance Platform']))].filter(Boolean).sort();
+            const currencies = [...new Set(allRows.map(r => r['Closing Balance Currency']))].filter(Boolean).sort();
 
-            const pf = document.getElementById('platformFilter');
-            pf.innerHTML = '<option value="">All</option>' + platforms.map(p => `<option value="${p}">${p}</option>`).join('');
-
-            const cf = document.getElementById('currencyFilter');
-            cf.innerHTML = '<option value="">All</option>' + currencies.map(c => `<option value="${c}">${c}</option>`).join('');
+            ['custPlatformFilter', 'acctPlatformFilter'].forEach(id => {
+                document.getElementById(id).innerHTML = '<option value="">All</option>' + platforms.map(p => `<option value="${p}">${p}</option>`).join('');
+            });
+            document.getElementById('acctCurrencyFilter').innerHTML = '<option value="">All</option>' + currencies.map(c => `<option value="${c}">${c}</option>`).join('');
         }
 
-        function applyFilters() {
-            const search = document.getElementById('searchBox').value.toLowerCase();
-            const platform = document.getElementById('platformFilter').value;
-            const currency = document.getElementById('currencyFilter').value;
-            const status = document.getElementById('statusFilter').value;
+        // ---- CUSTOMER VIEW ----
+        function applyCustomerFilters() {
+            const search = document.getElementById('custSearchBox').value.toLowerCase();
+            const platform = document.getElementById('custPlatformFilter').value;
+            const status = document.getElementById('custStatusFilter').value;
 
-            filteredData = allData.filter(r => {
+            filteredCustomers = customerData.filter(c => {
+                if (search && !c['Account Holder'].toLowerCase().includes(search)) return false;
+                if (platform && c['Balance Platform'] !== platform) return false;
+                if (status && c._status !== status) return false;
+                return true;
+            });
+
+            if (custSortCol) {
+                filteredCustomers.sort((a, b) => {
+                    let va = a[custSortCol], vb = b[custSortCol];
+                    if (typeof va === 'number' || custSortCol.startsWith('_')) { va = va || 0; vb = vb || 0; }
+                    if (va < vb) return custSortAsc ? -1 : 1;
+                    if (va > vb) return custSortAsc ? 1 : -1;
+                    return 0;
+                });
+            }
+
+            updateCustomerSummary();
+            custPage = 1;
+            renderCustomerTable();
+        }
+
+        function updateCustomerSummary() {
+            document.getElementById('custTotal').textContent = customerData.length;
+            document.getElementById('custNoPayout').textContent = customerData.filter(c => c._status === 'no-payout').length;
+            document.getElementById('custSettled').textContent = customerData.filter(c => c._status === 'settled').length;
+            document.getElementById('custNegative').textContent = customerData.filter(c => c._status === 'negative').length;
+        }
+
+        const custCols = [
+            { key: 'Balance Platform', label: 'Platform' },
+            { key: 'Account Holder', label: 'Account Holder' },
+            { key: '_numAccounts', label: 'Balance Accounts' },
+            { key: '_totalClosing', label: 'Total Closing Balance' },
+            { key: '_maxClosing', label: 'Max Closing Balance' },
+        ];
+
+        function renderCustomerTable() {
+            const thead = document.getElementById('custTableHead');
+            thead.innerHTML = '<th>#</th>' + custCols.map(col => {
+                const arrow = custSortCol === col.key ? (custSortAsc ? ' &#9650;' : ' &#9660;') : ' &#9650;';
+                const cls = custSortCol === col.key ? 'sorted' : '';
+                return `<th class="${cls}" data-col="${col.key}">${col.label}<span class="sort-arrow">${arrow}</span></th>`;
+            }).join('') + '<th>Status</th>';
+
+            thead.querySelectorAll('th[data-col]').forEach(th => {
+                th.onclick = () => {
+                    const col = th.dataset.col;
+                    if (custSortCol === col) custSortAsc = !custSortAsc;
+                    else { custSortCol = col; custSortAsc = true; }
+                    applyCustomerFilters();
+                };
+            });
+
+            const tbody = document.getElementById('custTableBody');
+            const start = (custPage - 1) * ROWS_PER_PAGE;
+            const pageData = filteredCustomers.slice(start, start + ROWS_PER_PAGE);
+
+            if (!pageData.length) {
+                tbody.innerHTML = '<tr><td colspan="' + (custCols.length + 2) + '" style="text-align:center;padding:40px;color:#999;">No matching records found</td></tr>';
+            } else {
+                tbody.innerHTML = pageData.map((c, i) => {
+                    const rowNum = start + i + 1;
+                    const cells = custCols.map(col => {
+                        const val = c[col.key];
+                        if (col.key === '_totalClosing' || col.key === '_maxClosing') {
+                            const cls = val === 0 ? 'zero' : (val < 0 ? 'negative-amt' : 'positive');
+                            return `<td class="amount ${cls}">${val.toFixed(2)}</td>`;
+                        }
+                        return `<td>${val}</td>`;
+                    }).join('');
+                    const badge = c._status === 'no-payout' ? '<span class="badge badge-no-payout">No Payout</span>'
+                        : c._status === 'negative' ? '<span class="badge badge-negative">Negative</span>'
+                        : '<span class="badge badge-settled">Settled</span>';
+                    return `<tr><td>${rowNum}</td>${cells}<td>${badge}</td></tr>`;
+                }).join('');
+            }
+
+            renderPagination('cust', filteredCustomers.length, custPage, p => { custPage = p; renderCustomerTable(); });
+        }
+
+        // ---- ACCOUNT VIEW ----
+        function applyAccountFilters() {
+            const search = document.getElementById('acctSearchBox').value.toLowerCase();
+            const platform = document.getElementById('acctPlatformFilter').value;
+            const currency = document.getElementById('acctCurrencyFilter').value;
+            const status = document.getElementById('acctStatusFilter').value;
+
+            filteredAccounts = allRows.filter(r => {
                 if (search && !r['Account Holder'].toLowerCase().includes(search) && !r['Balance Account'].toLowerCase().includes(search)) return false;
                 if (platform && r['Balance Platform'] !== platform) return false;
                 if (currency && r['Closing Balance Currency'] !== currency) return false;
@@ -250,67 +477,59 @@
                 return true;
             });
 
-            if (sortCol !== null) {
-                filteredData.sort((a, b) => {
-                    let va = a[sortCol], vb = b[sortCol];
-                    if (sortCol === 'Closing Balance Amount' || sortCol === 'Opening Balance Amount') {
+            if (acctSortCol) {
+                filteredAccounts.sort((a, b) => {
+                    let va = a[acctSortCol], vb = b[acctSortCol];
+                    if (acctSortCol === 'Closing Balance Amount' || acctSortCol === 'Opening Balance Amount') {
                         va = parseFloat(va) || 0; vb = parseFloat(vb) || 0;
                     }
-                    if (va < vb) return sortAsc ? -1 : 1;
-                    if (va > vb) return sortAsc ? 1 : -1;
+                    if (va < vb) return acctSortAsc ? -1 : 1;
+                    if (va > vb) return acctSortAsc ? 1 : -1;
                     return 0;
                 });
             }
 
-            updateSummary();
-            currentPage = 1;
-            renderTable();
+            updateAccountSummary();
+            acctPage = 1;
+            renderAccountTable();
         }
 
-        function updateSummary() {
-            const total = allData.length;
-            const noPayout = allData.filter(r => r._status === 'no-payout').length;
-            const payout = allData.filter(r => r._status === 'payout').length;
-            const negative = allData.filter(r => r._status === 'negative').length;
-
-            document.getElementById('totalCount').textContent = total;
-            document.getElementById('noPayoutCount').textContent = noPayout;
-            document.getElementById('payoutCount').textContent = payout;
-            document.getElementById('negativeCount').textContent = negative;
+        function updateAccountSummary() {
+            document.getElementById('acctTotal').textContent = allRows.length;
+            document.getElementById('acctNoPayout').textContent = allRows.filter(r => r._status === 'no-payout').length;
+            document.getElementById('acctSettled').textContent = allRows.filter(r => r._status === 'settled').length;
+            document.getElementById('acctNegative').textContent = allRows.filter(r => r._status === 'negative').length;
         }
 
-        const displayCols = ['Balance Platform', 'Account Holder', 'Balance Account', 'Opening Balance Currency', 'Opening Balance Amount', 'Opening Date', 'Closing Balance Currency', 'Closing Balance Amount', 'Closing Date'];
+        const acctCols = ['Balance Platform', 'Account Holder', 'Balance Account', 'Opening Balance Currency', 'Opening Balance Amount', 'Opening Date', 'Closing Balance Currency', 'Closing Balance Amount', 'Closing Date'];
 
-        function renderTable() {
-            // Header
-            const thead = document.getElementById('tableHead');
-            thead.innerHTML = '<th>#</th>' + displayCols.map(col => {
-                const arrow = sortCol === col ? (sortAsc ? ' &#9650;' : ' &#9660;') : ' &#9650;';
-                const cls = sortCol === col ? 'sorted' : '';
+        function renderAccountTable() {
+            const thead = document.getElementById('acctTableHead');
+            thead.innerHTML = '<th>#</th>' + acctCols.map(col => {
+                const arrow = acctSortCol === col ? (acctSortAsc ? ' &#9650;' : ' &#9660;') : ' &#9650;';
+                const cls = acctSortCol === col ? 'sorted' : '';
                 return `<th class="${cls}" data-col="${col}">${col}<span class="sort-arrow">${arrow}</span></th>`;
             }).join('') + '<th>Status</th>';
 
-            // Sorting click handlers
             thead.querySelectorAll('th[data-col]').forEach(th => {
                 th.onclick = () => {
                     const col = th.dataset.col;
-                    if (sortCol === col) sortAsc = !sortAsc;
-                    else { sortCol = col; sortAsc = true; }
-                    applyFilters();
+                    if (acctSortCol === col) acctSortAsc = !acctSortAsc;
+                    else { acctSortCol = col; acctSortAsc = true; }
+                    applyAccountFilters();
                 };
             });
 
-            // Body
-            const tbody = document.getElementById('tableBody');
-            const start = (currentPage - 1) * ROWS_PER_PAGE;
-            const pageData = filteredData.slice(start, start + ROWS_PER_PAGE);
+            const tbody = document.getElementById('acctTableBody');
+            const start = (acctPage - 1) * ROWS_PER_PAGE;
+            const pageData = filteredAccounts.slice(start, start + ROWS_PER_PAGE);
 
-            if (pageData.length === 0) {
-                tbody.innerHTML = '<tr><td colspan="' + (displayCols.length + 2) + '" style="text-align:center;padding:40px;color:#999;">No matching records found</td></tr>';
+            if (!pageData.length) {
+                tbody.innerHTML = '<tr><td colspan="' + (acctCols.length + 2) + '" style="text-align:center;padding:40px;color:#999;">No matching records found</td></tr>';
             } else {
                 tbody.innerHTML = pageData.map((r, i) => {
                     const rowNum = start + i + 1;
-                    const cells = displayCols.map(col => {
+                    const cells = acctCols.map(col => {
                         if (col === 'Closing Balance Amount' || col === 'Opening Balance Amount') {
                             const amt = parseFloat(r[col]) || 0;
                             const cls = amt === 0 ? 'zero' : (amt < 0 ? 'negative-amt' : 'positive');
@@ -318,71 +537,57 @@
                         }
                         return `<td>${r[col]}</td>`;
                     }).join('');
-
-                    let badge = '';
-                    if (r._status === 'no-payout') badge = '<span class="badge badge-no-payout">No Payout</span>';
-                    else if (r._status === 'negative') badge = '<span class="badge badge-negative">Negative</span>';
-                    else badge = '<span class="badge badge-payout">Payout</span>';
-
+                    const badge = r._status === 'no-payout' ? '<span class="badge badge-no-payout">No Payout</span>'
+                        : r._status === 'negative' ? '<span class="badge badge-negative">Negative</span>'
+                        : '<span class="badge badge-settled">Settled</span>';
                     return `<tr><td>${rowNum}</td>${cells}<td>${badge}</td></tr>`;
                 }).join('');
             }
 
-            renderPagination();
+            renderPagination('acct', filteredAccounts.length, acctPage, p => { acctPage = p; renderAccountTable(); });
         }
 
-        function renderPagination() {
-            const totalPages = Math.ceil(filteredData.length / ROWS_PER_PAGE) || 1;
-            document.getElementById('pageInfo').textContent = `Showing ${filteredData.length} records (Page ${currentPage} of ${totalPages})`;
+        // ---- SHARED PAGINATION ----
+        function renderPagination(prefix, totalItems, currentPageVal, onPageChange) {
+            const totalPages = Math.ceil(totalItems / ROWS_PER_PAGE) || 1;
+            document.getElementById(prefix + 'PageInfo').textContent = `Showing ${totalItems} records (Page ${currentPageVal} of ${totalPages})`;
 
-            const container = document.getElementById('pageButtons');
+            const container = document.getElementById(prefix + 'PageButtons');
             if (totalPages <= 1) { container.innerHTML = ''; return; }
 
             let btns = [];
-            const addBtn = (label, page, active = false) => {
-                btns.push(`<button class="page-btn ${active ? 'active' : ''}" data-page="${page}">${label}</button>`);
-            };
-
-            if (currentPage > 1) addBtn('Prev', currentPage - 1);
-            for (let p = Math.max(1, currentPage - 2); p <= Math.min(totalPages, currentPage + 2); p++) {
-                addBtn(p, p, p === currentPage);
+            if (currentPageVal > 1) btns.push(`<button class="page-btn" data-page="${currentPageVal - 1}">Prev</button>`);
+            for (let p = Math.max(1, currentPageVal - 2); p <= Math.min(totalPages, currentPageVal + 2); p++) {
+                btns.push(`<button class="page-btn ${p === currentPageVal ? 'active' : ''}" data-page="${p}">${p}</button>`);
             }
-            if (currentPage < totalPages) addBtn('Next', currentPage + 1);
+            if (currentPageVal < totalPages) btns.push(`<button class="page-btn" data-page="${currentPageVal + 1}">Next</button>`);
 
             container.innerHTML = btns.join('');
             container.querySelectorAll('.page-btn').forEach(btn => {
-                btn.onclick = () => { currentPage = parseInt(btn.dataset.page); renderTable(); };
+                btn.onclick = () => onPageChange(parseInt(btn.dataset.page));
             });
         }
 
-        // Event listeners
-        document.getElementById('searchBox').addEventListener('input', () => { currentPage = 1; applyFilters(); });
-        document.getElementById('platformFilter').addEventListener('change', applyFilters);
-        document.getElementById('currencyFilter').addEventListener('change', applyFilters);
-        document.getElementById('statusFilter').addEventListener('change', applyFilters);
+        // ---- EVENT LISTENERS ----
+        document.getElementById('custSearchBox').addEventListener('input', applyCustomerFilters);
+        document.getElementById('custPlatformFilter').addEventListener('change', applyCustomerFilters);
+        document.getElementById('custStatusFilter').addEventListener('change', applyCustomerFilters);
+        document.getElementById('acctSearchBox').addEventListener('input', applyAccountFilters);
+        document.getElementById('acctPlatformFilter').addEventListener('change', applyAccountFilters);
+        document.getElementById('acctCurrencyFilter').addEventListener('change', applyAccountFilters);
+        document.getElementById('acctStatusFilter').addEventListener('change', applyAccountFilters);
 
-        document.getElementById('toggleView').addEventListener('click', () => {
-            showingAll = !showingAll;
-            const btn = document.getElementById('toggleView');
-            const statusFilter = document.getElementById('statusFilter');
-            if (showingAll) {
-                statusFilter.value = '';
-                btn.textContent = 'Show No-Payout Only';
-                document.getElementById('tableTitle').textContent = 'All Customers';
-            } else {
-                statusFilter.value = 'no-payout';
-                btn.textContent = 'Show All';
-                document.getElementById('tableTitle').textContent = 'Customers Without Payout';
-            }
-            applyFilters();
-        });
-
-        document.getElementById('exportBtn').addEventListener('click', () => {
-            if (!filteredData.length) { alert('No data to export.'); return; }
-            const cols = displayCols.concat(['Status']);
-            const csvRows = [cols.join(',')];
-            filteredData.forEach(r => {
-                const vals = displayCols.map(c => `"${(r[c] || '').replace(/"/g, '""')}"`);
+        // ---- EXPORT ----
+        function exportCSV(data, columns, filename) {
+            if (!data.length) { alert('No data to export.'); return; }
+            const cols = typeof columns[0] === 'object' ? columns.map(c => c.label || c.key) : columns;
+            const keys = typeof columns[0] === 'object' ? columns.map(c => c.key) : columns;
+            const csvRows = [cols.concat(['Status']).join(',')];
+            data.forEach(r => {
+                const vals = keys.map(k => {
+                    const v = r[k];
+                    return `"${String(v != null ? v : '').replace(/"/g, '""')}"`;
+                });
                 vals.push(`"${r._status}"`);
                 csvRows.push(vals.join(','));
             });
@@ -390,9 +595,16 @@
             const url = URL.createObjectURL(blob);
             const a = document.createElement('a');
             a.href = url;
-            a.download = `no_payout_report_${new Date().toISOString().slice(0, 10)}.csv`;
+            a.download = filename;
             a.click();
             URL.revokeObjectURL(url);
+        }
+
+        document.getElementById('custExportBtn').addEventListener('click', () => {
+            exportCSV(filteredCustomers, custCols, `no_payout_customers_${new Date().toISOString().slice(0, 10)}.csv`);
+        });
+        document.getElementById('acctExportBtn').addEventListener('click', () => {
+            exportCSV(filteredAccounts, acctCols.map(c => ({key: c, label: c})), `no_payout_accounts_${new Date().toISOString().slice(0, 10)}.csv`);
         });
     </script>
 </body>
