@@ -115,11 +115,11 @@
         <div id="dashboard" class="hidden">
             <div class="report-date" id="reportDate"></div>
             <div class="tabs">
-                <div class="tab active" data-view="customers">Customers (Account Holders)</div>
-                <div class="tab" data-view="accounts">Balance Accounts (All Rows)</div>
+                <div class="tab" data-view="customers">Customers (Account Holders)</div>
+                <div class="tab active" data-view="accounts">Balance Accounts (All Rows)</div>
             </div>
 
-            <div id="customerView">
+            <div id="customerView" class="hidden">
                 <div class="summary-cards">
                     <div class="card total">
                         <div class="label">Total Customers</div>
@@ -180,7 +180,7 @@
                 </div>
             </div>
 
-            <div id="accountView" class="hidden">
+            <div id="accountView">
                 <div class="summary-cards">
                     <div class="card total">
                         <div class="label">Total Balance Accounts</div>
@@ -248,7 +248,7 @@
         let custPage = 1, acctPage = 1;
         let custSortCol = null, custSortAsc = true;
         let acctSortCol = null, acctSortAsc = true;
-        let currentView = 'customers';
+        let currentView = 'accounts';
 
         const dropZone = document.getElementById('dropZone');
         const fileInput = document.getElementById('fileInput');
