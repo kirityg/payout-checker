@@ -1,0 +1,399 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Balance Platform - Payout Checker</title>
+    <style>
+        * { margin: 0; padding: 0; box-sizing: border-box; }
+        body { font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif; background: #f0f2f5; color: #333; min-height: 100vh; }
+
+        .header { background: linear-gradient(135deg, #1a237e, #283593); color: white; padding: 20px 40px; display: flex; align-items: center; gap: 16px; box-shadow: 0 2px 8px rgba(0,0,0,0.15); }
+        .header h1 { font-size: 22px; font-weight: 600; }
+        .header .subtitle { font-size: 13px; opacity: 0.8; margin-top: 2px; }
+
+        .container { max-width: 1400px; margin: 30px auto; padding: 0 24px; }
+
+        .upload-section { background: white; border-radius: 12px; padding: 40px; text-align: center; border: 2px dashed #c5cae9; margin-bottom: 24px; transition: all 0.3s; cursor: pointer; }
+        .upload-section:hover, .upload-section.dragover { border-color: #3f51b5; background: #e8eaf6; }
+        .upload-section svg { width: 48px; height: 48px; fill: #7986cb; margin-bottom: 12px; }
+        .upload-section p { color: #666; margin-bottom: 8px; }
+        .upload-section .hint { font-size: 12px; color: #999; }
+        .upload-section input[type="file"] { display: none; }
+
+        .summary-cards { display: grid; grid-template-columns: repeat(auto-fit, minmax(220px, 1fr)); gap: 16px; margin-bottom: 24px; }
+        .card { background: white; border-radius: 12px; padding: 24px; box-shadow: 0 1px 4px rgba(0,0,0,0.08); }
+        .card .label { font-size: 13px; color: #888; text-transform: uppercase; letter-spacing: 0.5px; margin-bottom: 8px; }
+        .card .value { font-size: 32px; font-weight: 700; }
+        .card.total .value { color: #1a237e; }
+        .card.payout .value { color: #2e7d32; }
+        .card.no-payout .value { color: #c62828; }
+        .card.negative .value { color: #e65100; }
+
+        .results-section { background: white; border-radius: 12px; box-shadow: 0 1px 4px rgba(0,0,0,0.08); overflow: hidden; }
+        .results-header { padding: 20px 24px; display: flex; justify-content: space-between; align-items: center; border-bottom: 1px solid #eee; flex-wrap: wrap; gap: 12px; }
+        .results-header h2 { font-size: 18px; color: #c62828; }
+
+        .controls { display: flex; gap: 12px; align-items: center; flex-wrap: wrap; }
+        .search-box { padding: 8px 14px; border: 1px solid #ddd; border-radius: 8px; font-size: 14px; width: 250px; outline: none; transition: border 0.2s; }
+        .search-box:focus { border-color: #3f51b5; }
+
+        .btn { padding: 8px 18px; border: none; border-radius: 8px; font-size: 14px; cursor: pointer; font-weight: 500; transition: all 0.2s; }
+        .btn-export { background: #1a237e; color: white; }
+        .btn-export:hover { background: #283593; }
+        .btn-secondary { background: #e8eaf6; color: #1a237e; }
+        .btn-secondary:hover { background: #c5cae9; }
+
+        .filter-row { padding: 12px 24px; background: #fafafa; border-bottom: 1px solid #eee; display: flex; gap: 16px; align-items: center; flex-wrap: wrap; }
+        .filter-row label { font-size: 13px; color: #666; }
+        .filter-row select { padding: 6px 10px; border: 1px solid #ddd; border-radius: 6px; font-size: 13px; }
+
+        table { width: 100%; border-collapse: collapse; }
+        thead th { background: #f5f5f5; padding: 12px 16px; text-align: left; font-size: 13px; color: #555; font-weight: 600; text-transform: uppercase; letter-spacing: 0.3px; position: sticky; top: 0; cursor: pointer; user-select: none; white-space: nowrap; }
+        thead th:hover { background: #eee; }
+        thead th .sort-arrow { margin-left: 4px; font-size: 10px; opacity: 0.4; }
+        thead th.sorted .sort-arrow { opacity: 1; }
+        tbody tr { border-bottom: 1px solid #f0f0f0; transition: background 0.15s; }
+        tbody tr:hover { background: #fafafa; }
+        tbody td { padding: 10px 16px; font-size: 13px; white-space: nowrap; }
+        .amount { font-family: 'Consolas', 'Courier New', monospace; font-weight: 600; }
+        .amount.zero { color: #999; }
+        .amount.positive { color: #2e7d32; }
+        .amount.negative-amt { color: #c62828; }
+
+        .badge { display: inline-block; padding: 3px 10px; border-radius: 12px; font-size: 11px; font-weight: 600; }
+        .badge-no-payout { background: #ffebee; color: #c62828; }
+        .badge-payout { background: #e8f5e9; color: #2e7d32; }
+        .badge-negative { background: #fff3e0; color: #e65100; }
+
+        .table-container { max-height: 600px; overflow-y: auto; }
+        .no-data { text-align: center; padding: 60px; color: #999; }
+        .no-data svg { width: 64px; height: 64px; fill: #ddd; margin-bottom: 16px; }
+
+        .hidden { display: none !important; }
+
+        .pagination { padding: 16px 24px; display: flex; justify-content: space-between; align-items: center; border-top: 1px solid #eee; font-size: 13px; color: #666; }
+        .pagination .page-btns { display: flex; gap: 4px; }
+        .pagination .page-btn { padding: 6px 12px; border: 1px solid #ddd; background: white; border-radius: 6px; cursor: pointer; font-size: 13px; }
+        .pagination .page-btn.active { background: #1a237e; color: white; border-color: #1a237e; }
+        .pagination .page-btn:hover:not(.active) { background: #f5f5f5; }
+
+        @media (max-width: 768px) {
+            .header { padding: 16px 20px; }
+            .container { padding: 0 12px; margin: 16px auto; }
+            .upload-section { padding: 24px; }
+            .search-box { width: 100%; }
+        }
+    </style>
+</head>
+<body>
+    <div class="header">
+        <div>
+            <h1>Balance Platform - Payout Checker</h1>
+            <div class="subtitle">Upload daily CSV reports to identify customers without payouts</div>
+        </div>
+    </div>
+
+    <div class="container">
+        <div class="upload-section" id="dropZone">
+            <svg viewBox="0 0 24 24"><path d="M19.35 10.04C18.67 6.59 15.64 4 12 4 9.11 4 6.6 5.64 5.35 8.04 2.34 8.36 0 10.91 0 14c0 3.31 2.69 6 6 6h13c2.76 0 5-2.24 5-5 0-2.64-2.05-4.78-4.65-4.96zM14 13v4h-4v-4H7l5-5 5 5h-3z"/></svg>
+            <p><strong>Drop your CSV file here</strong> or click to browse</p>
+            <div class="hint">Supports Balance Platform balance report CSV files</div>
+            <input type="file" id="fileInput" accept=".csv">
+        </div>
+
+        <div id="dashboard" class="hidden">
+            <div class="summary-cards">
+                <div class="card total">
+                    <div class="label">Total Balance Accounts</div>
+                    <div class="value" id="totalCount">0</div>
+                </div>
+                <div class="card payout">
+                    <div class="label">With Payout</div>
+                    <div class="value" id="payoutCount">0</div>
+                </div>
+                <div class="card no-payout">
+                    <div class="label">No Payout (Zero Balance)</div>
+                    <div class="value" id="noPayoutCount">0</div>
+                </div>
+                <div class="card negative">
+                    <div class="label">Negative Closing Balance</div>
+                    <div class="value" id="negativeCount">0</div>
+                </div>
+            </div>
+
+            <div class="results-section">
+                <div class="results-header">
+                    <h2 id="tableTitle">Customers Without Payout</h2>
+                    <div class="controls">
+                        <input type="text" class="search-box" id="searchBox" placeholder="Search Account Holder or Balance Account...">
+                        <button class="btn btn-secondary" id="toggleView">Show All</button>
+                        <button class="btn btn-export" id="exportBtn">Export CSV</button>
+                    </div>
+                </div>
+                <div class="filter-row">
+                    <label>Platform:</label>
+                    <select id="platformFilter"><option value="">All</option></select>
+                    <label>Currency:</label>
+                    <select id="currencyFilter"><option value="">All</option></select>
+                    <label>Status:</label>
+                    <select id="statusFilter">
+                        <option value="no-payout">No Payout</option>
+                        <option value="payout">With Payout</option>
+                        <option value="negative">Negative Balance</option>
+                        <option value="">All</option>
+                    </select>
+                </div>
+                <div class="table-container" id="tableContainer">
+                    <table>
+                        <thead>
+                            <tr id="tableHead"></tr>
+                        </thead>
+                        <tbody id="tableBody"></tbody>
+                    </table>
+                </div>
+                <div class="pagination" id="pagination">
+                    <span id="pageInfo"></span>
+                    <div class="page-btns" id="pageButtons"></div>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <script>
+        const ROWS_PER_PAGE = 50;
+        let allData = [];
+        let filteredData = [];
+        let currentPage = 1;
+        let sortCol = null;
+        let sortAsc = true;
+        let showingAll = false;
+
+        const dropZone = document.getElementById('dropZone');
+        const fileInput = document.getElementById('fileInput');
+        const dashboard = document.getElementById('dashboard');
+
+        // Drag & drop
+        dropZone.addEventListener('click', () => fileInput.click());
+        dropZone.addEventListener('dragover', e => { e.preventDefault(); dropZone.classList.add('dragover'); });
+        dropZone.addEventListener('dragleave', () => dropZone.classList.remove('dragover'));
+        dropZone.addEventListener('drop', e => {
+            e.preventDefault();
+            dropZone.classList.remove('dragover');
+            if (e.dataTransfer.files.length) handleFile(e.dataTransfer.files[0]);
+        });
+        fileInput.addEventListener('change', e => { if (e.target.files.length) handleFile(e.target.files[0]); });
+
+        function handleFile(file) {
+            if (!file.name.endsWith('.csv')) { alert('Please upload a CSV file.'); return; }
+            const reader = new FileReader();
+            reader.onload = e => parseCSV(e.target.result);
+            reader.readAsText(file);
+        }
+
+        function parseCSV(text) {
+            const lines = text.trim().split('\n');
+            if (lines.length < 2) { alert('CSV file appears empty.'); return; }
+
+            const headers = lines[0].split(',').map(h => h.trim());
+            allData = [];
+
+            for (let i = 1; i < lines.length; i++) {
+                const values = lines[i].split(',').map(v => v.trim());
+                if (values.length < 9) continue;
+                const row = {};
+                headers.forEach((h, idx) => row[h] = values[idx] || '');
+                row._closingAmt = parseFloat(row['Closing Balance Amount']) || 0;
+                row._openingAmt = parseFloat(row['Opening Balance Amount']) || 0;
+
+                if (row._closingAmt === 0 && row._openingAmt === 0) {
+                    row._status = 'no-payout';
+                } else if (row._closingAmt < 0) {
+                    row._status = 'negative';
+                } else {
+                    row._status = 'payout';
+                }
+                allData.push(row);
+            }
+
+            populateFilters();
+            showingAll = false;
+            document.getElementById('statusFilter').value = 'no-payout';
+            document.getElementById('toggleView').textContent = 'Show All';
+            document.getElementById('tableTitle').textContent = 'Customers Without Payout';
+            applyFilters();
+            dashboard.classList.remove('hidden');
+        }
+
+        function populateFilters() {
+            const platforms = [...new Set(allData.map(r => r['Balance Platform']))].filter(Boolean).sort();
+            const currencies = [...new Set(allData.map(r => r['Closing Balance Currency']))].filter(Boolean).sort();
+
+            const pf = document.getElementById('platformFilter');
+            pf.innerHTML = '<option value="">All</option>' + platforms.map(p => `<option value="${p}">${p}</option>`).join('');
+
+            const cf = document.getElementById('currencyFilter');
+            cf.innerHTML = '<option value="">All</option>' + currencies.map(c => `<option value="${c}">${c}</option>`).join('');
+        }
+
+        function applyFilters() {
+            const search = document.getElementById('searchBox').value.toLowerCase();
+            const platform = document.getElementById('platformFilter').value;
+            const currency = document.getElementById('currencyFilter').value;
+            const status = document.getElementById('statusFilter').value;
+
+            filteredData = allData.filter(r => {
+                if (search && !r['Account Holder'].toLowerCase().includes(search) && !r['Balance Account'].toLowerCase().includes(search)) return false;
+                if (platform && r['Balance Platform'] !== platform) return false;
+                if (currency && r['Closing Balance Currency'] !== currency) return false;
+                if (status && r._status !== status) return false;
+                return true;
+            });
+
+            if (sortCol !== null) {
+                filteredData.sort((a, b) => {
+                    let va = a[sortCol], vb = b[sortCol];
+                    if (sortCol === 'Closing Balance Amount' || sortCol === 'Opening Balance Amount') {
+                        va = parseFloat(va) || 0; vb = parseFloat(vb) || 0;
+                    }
+                    if (va < vb) return sortAsc ? -1 : 1;
+                    if (va > vb) return sortAsc ? 1 : -1;
+                    return 0;
+                });
+            }
+
+            updateSummary();
+            currentPage = 1;
+            renderTable();
+        }
+
+        function updateSummary() {
+            const total = allData.length;
+            const noPayout = allData.filter(r => r._status === 'no-payout').length;
+            const payout = allData.filter(r => r._status === 'payout').length;
+            const negative = allData.filter(r => r._status === 'negative').length;
+
+            document.getElementById('totalCount').textContent = total;
+            document.getElementById('noPayoutCount').textContent = noPayout;
+            document.getElementById('payoutCount').textContent = payout;
+            document.getElementById('negativeCount').textContent = negative;
+        }
+
+        const displayCols = ['Balance Platform', 'Account Holder', 'Balance Account', 'Opening Balance Currency', 'Opening Balance Amount', 'Opening Date', 'Closing Balance Currency', 'Closing Balance Amount', 'Closing Date'];
+
+        function renderTable() {
+            // Header
+            const thead = document.getElementById('tableHead');
+            thead.innerHTML = '<th>#</th>' + displayCols.map(col => {
+                const arrow = sortCol === col ? (sortAsc ? ' &#9650;' : ' &#9660;') : ' &#9650;';
+                const cls = sortCol === col ? 'sorted' : '';
+                return `<th class="${cls}" data-col="${col}">${col}<span class="sort-arrow">${arrow}</span></th>`;
+            }).join('') + '<th>Status</th>';
+
+            // Sorting click handlers
+            thead.querySelectorAll('th[data-col]').forEach(th => {
+                th.onclick = () => {
+                    const col = th.dataset.col;
+                    if (sortCol === col) sortAsc = !sortAsc;
+                    else { sortCol = col; sortAsc = true; }
+                    applyFilters();
+                };
+            });
+
+            // Body
+            const tbody = document.getElementById('tableBody');
+            const start = (currentPage - 1) * ROWS_PER_PAGE;
+            const pageData = filteredData.slice(start, start + ROWS_PER_PAGE);
+
+            if (pageData.length === 0) {
+                tbody.innerHTML = '<tr><td colspan="' + (displayCols.length + 2) + '" style="text-align:center;padding:40px;color:#999;">No matching records found</td></tr>';
+            } else {
+                tbody.innerHTML = pageData.map((r, i) => {
+                    const rowNum = start + i + 1;
+                    const cells = displayCols.map(col => {
+                        if (col === 'Closing Balance Amount' || col === 'Opening Balance Amount') {
+                            const amt = parseFloat(r[col]) || 0;
+                            const cls = amt === 0 ? 'zero' : (amt < 0 ? 'negative-amt' : 'positive');
+                            return `<td class="amount ${cls}">${r[col]}</td>`;
+                        }
+                        return `<td>${r[col]}</td>`;
+                    }).join('');
+
+                    let badge = '';
+                    if (r._status === 'no-payout') badge = '<span class="badge badge-no-payout">No Payout</span>';
+                    else if (r._status === 'negative') badge = '<span class="badge badge-negative">Negative</span>';
+                    else badge = '<span class="badge badge-payout">Payout</span>';
+
+                    return `<tr><td>${rowNum}</td>${cells}<td>${badge}</td></tr>`;
+                }).join('');
+            }
+
+            renderPagination();
+        }
+
+        function renderPagination() {
+            const totalPages = Math.ceil(filteredData.length / ROWS_PER_PAGE) || 1;
+            document.getElementById('pageInfo').textContent = `Showing ${filteredData.length} records (Page ${currentPage} of ${totalPages})`;
+
+            const container = document.getElementById('pageButtons');
+            if (totalPages <= 1) { container.innerHTML = ''; return; }
+
+            let btns = [];
+            const addBtn = (label, page, active = false) => {
+                btns.push(`<button class="page-btn ${active ? 'active' : ''}" data-page="${page}">${label}</button>`);
+            };
+
+            if (currentPage > 1) addBtn('Prev', currentPage - 1);
+            for (let p = Math.max(1, currentPage - 2); p <= Math.min(totalPages, currentPage + 2); p++) {
+                addBtn(p, p, p === currentPage);
+            }
+            if (currentPage < totalPages) addBtn('Next', currentPage + 1);
+
+            container.innerHTML = btns.join('');
+            container.querySelectorAll('.page-btn').forEach(btn => {
+                btn.onclick = () => { currentPage = parseInt(btn.dataset.page); renderTable(); };
+            });
+        }
+
+        // Event listeners
+        document.getElementById('searchBox').addEventListener('input', () => { currentPage = 1; applyFilters(); });
+        document.getElementById('platformFilter').addEventListener('change', applyFilters);
+        document.getElementById('currencyFilter').addEventListener('change', applyFilters);
+        document.getElementById('statusFilter').addEventListener('change', applyFilters);
+
+        document.getElementById('toggleView').addEventListener('click', () => {
+            showingAll = !showingAll;
+            const btn = document.getElementById('toggleView');
+            const statusFilter = document.getElementById('statusFilter');
+            if (showingAll) {
+                statusFilter.value = '';
+                btn.textContent = 'Show No-Payout Only';
+                document.getElementById('tableTitle').textContent = 'All Customers';
+            } else {
+                statusFilter.value = 'no-payout';
+                btn.textContent = 'Show All';
+                document.getElementById('tableTitle').textContent = 'Customers Without Payout';
+            }
+            applyFilters();
+        });
+
+        document.getElementById('exportBtn').addEventListener('click', () => {
+            if (!filteredData.length) { alert('No data to export.'); return; }
+            const cols = displayCols.concat(['Status']);
+            const csvRows = [cols.join(',')];
+            filteredData.forEach(r => {
+                const vals = displayCols.map(c => `"${(r[c] || '').replace(/"/g, '""')}"`);
+                vals.push(`"${r._status}"`);
+                csvRows.push(vals.join(','));
+            });
+            const blob = new Blob([csvRows.join('\n')], { type: 'text/csv' });
+            const url = URL.createObjectURL(blob);
+            const a = document.createElement('a');
+            a.href = url;
+            a.download = `no_payout_report_${new Date().toISOString().slice(0, 10)}.csv`;
+            a.click();
+            URL.revokeObjectURL(url);
+        });
+    </script>
+</body>
+</html>
