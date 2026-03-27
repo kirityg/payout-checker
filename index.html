@@ -93,19 +93,20 @@
     </div>
 
     <div class="container">
-        <div class="upload-section" id="dropZone">
+        <div id="uploadFull" class="upload-section" >
             <svg viewBox="0 0 24 24"><path d="M19.35 10.04C18.67 6.59 15.64 4 12 4 9.11 4 6.6 5.64 5.35 8.04 2.34 8.36 0 10.91 0 14c0 3.31 2.69 6 6 6h13c2.76 0 5-2.24 5-5 0-2.64-2.05-4.78-4.65-4.96zM14 13v4h-4v-4H7l5-5 5 5h-3z"/></svg>
             <p><strong>Drop your CSV file here</strong> or click to browse</p>
             <div class="hint">Supports Balance Platform balance report CSV files</div>
-            <div class="file-info hidden" id="fileInfo"></div>
-            <input type="file" id="fileInput" accept=".csv">
+        </div>
+        <input type="file" id="fileInput" accept=".csv" style="display:none;">
+
+        <div id="actionBar" class="hidden" style="display:flex; gap:12px; margin-bottom:20px; align-items:center;">
+            <button class="btn btn-export" id="uploadNewBtn" style="background:#3f51b5;">Upload New File</button>
+            <button class="btn" id="resetBtn" style="background:#c62828; color:white;">Reset</button>
+            <span class="file-info" id="fileInfo" style="margin-left:auto;"></span>
         </div>
 
         <div id="dashboard" class="hidden">
-            <div style="display:flex; gap:12px; margin-bottom:20px;">
-                <button class="btn btn-export" id="uploadNewBtn" style="background:#3f51b5;">Upload New File</button>
-                <button class="btn" id="resetBtn" style="background:#c62828; color:white;">Reset</button>
-            </div>
             <div class="summary-cards">
                 <div class="card total">
                     <div class="label">Total Balance Accounts</div>
@@ -155,26 +156,28 @@
         let page = 1;
         let sortCol = null, sortAsc = true;
 
-        const dropZone = document.getElementById('dropZone');
+        const uploadFull = document.getElementById('uploadFull');
+        const actionBar = document.getElementById('actionBar');
         const fileInput = document.getElementById('fileInput');
         const dashboard = document.getElementById('dashboard');
 
-        // Drag & drop
-        dropZone.addEventListener('click', () => fileInput.click());
-        dropZone.addEventListener('dragover', e => { e.preventDefault(); dropZone.classList.add('dragover'); });
-        dropZone.addEventListener('dragleave', () => dropZone.classList.remove('dragover'));
-        dropZone.addEventListener('drop', e => {
+        // Drag & drop on full upload area
+        uploadFull.addEventListener('click', () => fileInput.click());
+        uploadFull.addEventListener('dragover', e => { e.preventDefault(); uploadFull.classList.add('dragover'); });
+        uploadFull.addEventListener('dragleave', () => uploadFull.classList.remove('dragover'));
+        uploadFull.addEventListener('drop', e => {
             e.preventDefault();
-            dropZone.classList.remove('dragover');
+            uploadFull.classList.remove('dragover');
             if (e.dataTransfer.files.length) handleFile(e.dataTransfer.files[0]);
         });
         fileInput.addEventListener('change', e => { if (e.target.files.length) handleFile(e.target.files[0]); });
 
         function handleFile(file) {
             if (!file.name.endsWith('.csv')) { alert('Please upload a CSV file.'); return; }
-            const info = document.getElementById('fileInfo');
-            info.textContent = 'Loaded: ' + file.name;
-            info.classList.remove('hidden');
+            document.getElementById('fileInfo').textContent = 'Loaded: ' + file.name;
+            uploadFull.classList.add('hidden');
+            actionBar.style.display = 'flex';
+            actionBar.classList.remove('hidden');
             const reader = new FileReader();
             reader.onload = e => parseCSV(e.target.result, file.name);
             reader.readAsText(file);
@@ -333,8 +336,10 @@
         document.getElementById('resetBtn').addEventListener('click', () => {
             allRows = []; noPayout = []; filtered = []; page = 1; sortCol = null; sortAsc = true;
             dashboard.classList.add('hidden');
+            actionBar.style.display = 'none';
+            actionBar.classList.add('hidden');
+            uploadFull.classList.remove('hidden');
             document.getElementById('headerInfo').classList.add('hidden');
-            document.getElementById('fileInfo').classList.add('hidden');
             fileInput.value = '';
             document.getElementById('searchBox').value = '';
             document.getElementById('platformFilter').innerHTML = '<option value="">All</option>';
