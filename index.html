@@ -102,6 +102,10 @@
         </div>
 
         <div id="dashboard" class="hidden">
+            <div style="display:flex; gap:12px; margin-bottom:20px;">
+                <button class="btn btn-export" id="uploadNewBtn" style="background:#3f51b5;">Upload New File</button>
+                <button class="btn" id="resetBtn" style="background:#c62828; color:white;">Reset</button>
+            </div>
             <div class="summary-cards">
                 <div class="card total">
                     <div class="label">Total Balance Accounts</div>
@@ -323,6 +327,19 @@
                 btn.onclick = () => { page = parseInt(btn.dataset.page); renderTable(); };
             });
         }
+
+        // Upload New / Reset
+        document.getElementById('uploadNewBtn').addEventListener('click', () => fileInput.click());
+        document.getElementById('resetBtn').addEventListener('click', () => {
+            allRows = []; noPayout = []; filtered = []; page = 1; sortCol = null; sortAsc = true;
+            dashboard.classList.add('hidden');
+            document.getElementById('headerInfo').classList.add('hidden');
+            document.getElementById('fileInfo').classList.add('hidden');
+            fileInput.value = '';
+            document.getElementById('searchBox').value = '';
+            document.getElementById('platformFilter').innerHTML = '<option value="">All</option>';
+            document.getElementById('currencyFilter').innerHTML = '<option value="">All</option>';
+        });
 
         // Event listeners
         document.getElementById('searchBox').addEventListener('input', applyFilters);
