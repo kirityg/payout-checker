@@ -192,12 +192,13 @@
 
             for (let i = 1; i < lines.length; i++) {
                 const values = lines[i].split(',').map(v => v.trim());
-                if (values.length < 9) continue;
+                if (values.length < 4) continue;
                 const row = {};
                 headers.forEach((h, idx) => row[h] = values[idx] || '');
                 row._closingAmt = parseFloat(row['Closing Balance Amount']) || 0;
                 row._openingAmt = parseFloat(row['Opening Balance Amount']) || 0;
                 row._diff = row._closingAmt - row._openingAmt;
+                row._currency = row['Closing Balance Currency'] || row['Opening Balance Currency'] || '';
                 allRows.push(row);
             }
 
@@ -227,7 +228,7 @@
             document.getElementById('acctNoPayout').textContent = noPayout.length;
 
             // Populate filters
-            const currencies = [...new Set(allRows.map(r => r['Closing Balance Currency']))].filter(Boolean).sort();
+            const currencies = [...new Set(allRows.map(r => r._currency))].filter(Boolean).sort();
             document.getElementById('platformFilter').innerHTML = '<option value="">All</option>' + platforms.sort().map(p => `<option value="${p}">${p}</option>`).join('');
             document.getElementById('currencyFilter').innerHTML = '<option value="">All</option>' + currencies.map(c => `<option value="${c}">${c}</option>`).join('');
 
@@ -243,7 +244,7 @@
             filtered = noPayout.filter(r => {
                 if (search && !r['Account Holder'].toLowerCase().includes(search) && !r['Balance Account'].toLowerCase().includes(search)) return false;
                 if (platform && r['Balance Platform'] !== platform) return false;
-                if (currency && r['Closing Balance Currency'] !== currency) return false;
+                if (currency && r._currency !== currency) return false;
                 return true;
             });
 
@@ -267,7 +268,7 @@
             { key: 'Balance Platform', label: 'Platform' },
             { key: 'Account Holder', label: 'Account Holder' },
             { key: 'Balance Account', label: 'Balance Account' },
-            { key: 'Closing Balance Currency', label: 'Currency' },
+            { key: '_currency', label: 'Currency' },
             { key: 'Opening Balance Amount', label: 'Opening Balance' },
             { key: 'Closing Balance Amount', label: 'Closing Balance' },
             { key: '_diff', label: 'Difference (CB - OB)' },
